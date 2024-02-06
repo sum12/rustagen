@@ -1,27 +1,10 @@
+use rustagen::*;
 use std::io::StdoutLock;
 use std::io::Write;
 
 use anyhow::bail;
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct Message {
-    src: String,
-    #[serde(rename = "dest")]
-    dst: String,
-    body: Body,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct Body {
-    #[serde(rename = "msg_id")]
-    id: Option<usize>,
-    in_reply_to: Option<usize>,
-
-    #[serde(flatten)]
-    payload: Payload,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -44,8 +27,8 @@ struct EchoNode {
     id: usize,
 }
 
-impl EchoNode {
-    pub fn step(&mut self, input: Message, output: &mut StdoutLock) -> anyhow::Result<()> {
+impl Node<Payload> for EchoNode {
+    fn step(&mut self, input: Message<Payload>, output: &mut StdoutLock) -> anyhow::Result<()> {
         match input.body.payload {
             Payload::Init { .. } => {
                 let reply = Message {
@@ -90,20 +73,5 @@ impl EchoNode {
     }
 }
 fn main() -> anyhow::Result<()> {
-    let mut stdout = std::io::stdout().lock();
-    //     let mut output = serde_json::Serializer::new(stdout);
-
-    let stdin = std::io::stdin().lock();
-    let inputs = serde_json::Deserializer::from_reader(stdin).into_iter::<Message>();
-
-    let mut state = EchoNode { id: 0 };
-
-    for input in inputs {
-        let input = input.context("MaleStrom input could not be deserialized")?;
-        state
-            .step(input, &mut stdout)
-            .context("Node step function failed")?;
-    }
-
-    Ok(())
+    main_loop(EchoNode { id: 0 })
 }
